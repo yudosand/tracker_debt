@@ -49,6 +49,10 @@ Buka `http://127.0.0.1:5174/tracker_debt/`. Untuk Google OAuth lokal, gunakan `h
 
 ## Perhitungan
 
+Setiap kartu utang menampilkan target bulan lunas dan **Rincian N bulan** yang dapat dibuka. Jadwal mencakup nama bulan/tahun, nominal angsuran, jatuh tempo, status, dan tanggal pembayaran sebenarnya. Bulan angsuran mengikuti tanggal jatuh tempo pertama; pembayaran lebih awal atau terlambat tidak menggeser jadwal kontrak. Target lunas adalah akhir jadwal, dengan asumsi pembayaran sesuai jadwal.
+
+Jumlah bulan yang sudah dibayar saat membuat kontrak dianggap sebagai angsuran berurutan dari awal jadwal. Rincian menandainya sebagai saldo awal tanpa mengarang tanggal pembayaran. Pembayaran baru dan pembatalan otomatis memperbarui rincian dari jurnal yang sama, tanpa perubahan struktur spreadsheet.
+
 Total kewajiban = tenor × cicilan bulanan. Pokok pinjaman disimpan terpisah. Contoh Rp10 juta, 12 × Rp1,1 juta: total Rp13,2 juta; setelah 4 bulan, terbayar Rp4,4 juta dan sisa Rp8,8 juta / 8 bulan. Ini sisa cicilan termasuk bunga, bukan sisa pokok atau angka pelunasan dipercepat. Tidak mencakup denda, cicilan parsial, bunga berubah, atau restrukturisasi.
 
 ## Akses

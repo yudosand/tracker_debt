@@ -6,6 +6,14 @@ export const rupiah=(v:number)=>new Intl.NumberFormat('id-ID',{style:'currency',
 export const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 export function dueDate(d:Debt,n:number){const[y,m,day]=d.firstDue.split('-').map(Number);const date=new Date(Date.UTC(y,m-1+n-1,1));const last=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate();date.setUTCDate(Math.min(day,last));return date.toISOString().slice(0,10);}
 export function stats(d:Debt,ps:Payment[]){const count=d.initialPaid+ps.filter(p=>p.debtId===d.id&&!p.voidedAt).length;return{count,total:d.months*d.installment,paid:count*d.installment,remaining:(d.months-count)*d.installment,left:d.months-count,percent:Math.round(count/d.months*100),nextDue:count<d.months?dueDate(d,count+1):null};}
+export function installmentSchedule(d:Debt,ps:Payment[],asOf=today()){
+  const payments=new Map(ps.filter(p=>p.debtId===d.id&&!p.voidedAt).map(p=>[p.number,p]));
+  return Array.from({length:d.months},(_,index)=>{
+    const number=index+1,due=dueDate(d,number),payment=payments.get(number),initial=number<=d.initialPaid;
+    const status:'paid'|'overdue'|'due'|'upcoming'=initial||payment?'paid':due<asOf?'overdue':due===asOf?'due':'upcoming';
+    return {number,due,amount:d.installment,paidAmount:initial?d.installment:payment?.amount??0,paidAt:payment?.paidAt??null,initial,status};
+  });
+}
 export function validateDebt(d:Debt){
   if(!d||typeof d.id!=='string'||!/^[\w-]{1,80}$/.test(d.id)||typeof d.name!=='string'||!d.name.trim()||d.name.length>80||typeof d.contract!=='string'||d.contract.length>100)throw new Error('Nama atau nomor kontrak tidak valid.');
   if(!Number.isSafeInteger(d.principal)||d.principal<1||d.principal>1e12||!Number.isSafeInteger(d.installment)||d.installment<1||d.installment>1e12)throw new Error('Nominal harus berupa rupiah bulat yang positif.');
