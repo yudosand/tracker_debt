@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {HEADERS,encodeEntry,replay} from '../src/journal.ts';
-import {createSheetsClient,parseSheetId,LoginRequired} from '../src/google.ts';
+import {createSheetsClient,parseSheetId,LoginRequired,SheetsRequestError,creationMayHaveSucceeded} from '../src/google.ts';
 import {stats} from '../src/debt.ts';
 const id='test-spreadsheet-id-1234567890';
 const debt={id:'shopee',name:'Shopee',contract:'001',principal:10000000,months:12,installment:1100000,initialPaid:4,firstDue:'2026-01-31',color:'orange'};
@@ -35,3 +35,39 @@ test('lost response is recoverable without appending a duplicate payment',async(
 test('concurrent HTTP writes: exactly one payment succeeds',async()=>{const f=fixture();const results=await Promise.allSettled([f.client.write(id,pay()),f.client.write(id,pay(5,'second'))]);assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(f.rows.length,4);assert.equal(replay(f.rows).ledger.payments.length,1);});
 test('expired, denied, missing and rate-limited access never return demo',async()=>{for(const status of [401,403,404,429]){const client=createSheetsClient(async()=>new Response('{}',{status}),()=> 'test-token');await assert.rejects(client.read(id),status===401?LoginRequired:Error);}});
 test('spreadsheet creation sends empty journal and least data required',async()=>{let call;const client=createSheetsClient(async(url,options)=>{call={url,options};return Response.json({spreadsheetId:id});},()=> 'test-token');assert.equal(await client.create(),id);const body=JSON.parse(call.options.body);assert.equal(body.sheets[0].properties.title,'Transaksi');assert.equal(body.sheets[0].data[0].rowData.length,1);assert.equal(body.sheets[0].data[0].rowData[0].values[0].userEnteredValue.stringValue,'eventId');assert.equal(call.options.headers.Authorization,'Bearer test-token');});
+
+test('create does not force an optional locale that Google may reject',async()=>{
+  const client=createSheetsClient(async(url,options)=>{
+    const body=JSON.parse(options.body);
+    assert.equal(body.properties.timeZone,'Asia/Jakarta');
+    assert.equal(Object.hasOwn(body.properties,'locale'),false);
+    assert.equal(body.sheets[0].properties.gridProperties.columnCount,HEADERS.length);
+    return Response.json({spreadsheetId:id});
+  },()=> 'test-token');
+  assert.equal(await client.create(),id);
+});
+
+test('400 creation rejection exposes Google detail and allows retry without uncertain-file warning',async()=>{
+  let calls=0;
+  const client=createSheetsClient(async()=>{calls++;return Response.json({error:{message:'Invalid value at spreadsheet.properties.locale'}},{status:400});},()=> 'test-token');
+  await assert.rejects(client.create(),e=>{
+    assert.ok(e instanceof SheetsRequestError);assert.equal(e.status,400);
+    assert.match(e.message,/Detail Google: Invalid value/);
+    assert.equal(creationMayHaveSucceeded(e),false);return true;
+  });
+  assert.equal(calls,1);
+});
+
+test('ambiguous creation failures still require checking Drive; known rejections do not',async()=>{
+  for(const status of [400,403,404,408,429,500,503]){
+    const client=createSheetsClient(async()=>new Response('not JSON',{status}),()=> 'test-token');
+    await assert.rejects(client.create(),e=>{
+      assert.ok(e instanceof SheetsRequestError);
+      assert.equal(creationMayHaveSucceeded(e),status===408||status>=500);
+      assert.doesNotMatch(e.message,/SyntaxError|not JSON/);return true;
+    });
+  }
+  const client=createSheetsClient(async()=>{throw new Error('offline');},()=> 'test-token');
+  await assert.rejects(client.create(),e=>{assert.equal(creationMayHaveSucceeded(e),true);return true;});
+  assert.equal(creationMayHaveSucceeded(new LoginRequired()),false);
+});

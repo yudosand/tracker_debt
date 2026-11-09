@@ -7,6 +7,14 @@ const SETTINGS_KEY='lunas-pages-settings-v1';
 const SCOPE='https://www.googleapis.com/auth/drive.file';
 let accessToken='',expiresAt=0;
 export class LoginRequired extends Error{constructor(){super('Sesi Google berakhir atau belum terhubung. Klik Hubungkan Google untuk melanjutkan.');}}
+export class SheetsRequestError extends Error{
+  status:number;
+  constructor(status:number,message:string){super(message);this.name='SheetsRequestError';this.status=status;}
+}
+export function creationMayHaveSucceeded(error:unknown){
+  if(error instanceof LoginRequired)return false;
+  return !(error instanceof SheetsRequestError&&error.status>=400&&error.status<500&&error.status!==408);
+}
 export function connected(){return !!accessToken&&Date.now()<expiresAt;}
 export function disconnect(){accessToken='';expiresAt=0;}
 export function getSettings():Settings{try{const s=JSON.parse(localStorage.getItem(SETTINGS_KEY)||'{}');return{clientId:typeof s.clientId==='string'?s.clientId:(import.meta.env?.VITE_GOOGLE_CLIENT_ID||''),spreadsheetId:typeof s.spreadsheetId==='string'?s.spreadsheetId:''};}catch{return{clientId:import.meta.env?.VITE_GOOGLE_CLIENT_ID||'',spreadsheetId:''};}}
@@ -26,10 +34,12 @@ export function createSheetsClient(request:typeof fetch=fetch,token:()=>string=(
   async function api(path:string,init:RequestInit={}){
     let r:Response;try{r=await request('https://sheets.googleapis.com/v4/spreadsheets'+path,{...init,headers:{Authorization:'Bearer '+token(),'Content-Type':'application/json'},cache:'no-store',signal:AbortSignal.timeout(25000)});}catch(e){if(e instanceof LoginRequired)throw e;throw new Error('Koneksi Google terputus. Muat ulang data untuk memeriksa apakah perubahan sudah tercatat.');}
     if(r.status===401){disconnect();throw new LoginRequired();}
-    if(r.status===403)throw new Error('Akses ditolak. Pastikan Sheets API aktif dan spreadsheet dibuat melalui OAuth Client ID serta akun Google yang sama.');
-    if(r.status===404)throw new Error('Spreadsheet tidak ditemukan atau belum diizinkan untuk aplikasi ini.');
-    if(r.status===429)throw new Error('Batas permintaan Google tercapai. Tunggu sebentar lalu muat ulang.');
-    if(!r.ok)throw new Error('Google Sheets gagal memproses permintaan ('+r.status+'). Periksa spreadsheet sebelum mencoba lagi.');
+    if(!r.ok){
+      let detail='';
+      try{const body=await r.json();if(typeof body?.error?.message==='string')detail=body.error.message.replace(/\s+/g,' ').trim().slice(0,600);}catch{/* Some gateways return HTML instead of JSON. */}
+      const message=r.status===403?'Akses ditolak. Pastikan Sheets API aktif dan spreadsheet dibuat melalui OAuth Client ID serta akun Google yang sama.':r.status===404?'Spreadsheet tidak ditemukan atau belum diizinkan untuk aplikasi ini.':r.status===429?'Batas permintaan Google tercapai. Tunggu sebentar lalu muat ulang.':r.status===400?'Google Sheets menolak format permintaan (400).':'Google Sheets gagal memproses permintaan ('+r.status+').';
+      throw new SheetsRequestError(r.status,message+(detail?' Detail Google: '+detail:''));
+    }
     return r.json();
   }
   async function read(id:string):Promise<Projection>{const sheet=parseSheetId(id);const body=await api('/'+sheet+'/values/'+encodeURIComponent("'Transaksi'!A1:P50001")+'?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING') as {values?:unknown[][]};const rows=body.values||[];if(rows.length>50000)throw new Error('Jurnal melebihi 50.000 baris. Arsipkan data sebelum melanjutkan.');return replay(rows);}
@@ -44,8 +54,10 @@ export function createSheetsClient(request:typeof fetch=fetch,token:()=>string=(
     return after;
   }
   async function create():Promise<string>{
+    // Let Google choose the spreadsheet locale. Dashboard formatting remains id-ID;
+    // RAW journal values do not depend on a spreadsheet's regional setting.
     const header={values:HEADERS.map(h=>({userEnteredValue:{stringValue:h},userEnteredFormat:{backgroundColor:{red:.15,green:.43,blue:.31},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}}}}))};
-    const result=await api('',{method:'POST',body:JSON.stringify({properties:{title:'Lunas — Debt Tracker',locale:'id_ID',timeZone:'Asia/Jakarta'},sheets:[{properties:{title:'Transaksi',gridProperties:{rowCount:1000,columnCount:16,frozenRowCount:1}},data:[{startRow:0,startColumn:0,rowData:[header]}]},{properties:{title:'Panduan',gridProperties:{rowCount:20,columnCount:2}},data:[{rowData:[{values:[{userEnteredValue:{stringValue:'Lunas — jurnal cicilan pribadi'}}]},{values:[{userEnteredValue:{stringValue:'Gunakan dashboard untuk menambah utang, membayar, dan membatalkan catatan. Setiap aksi menambah baris di Transaksi.'}}]},{values:[{userEnteredValue:{stringValue:'Jangan menghapus, mengurutkan, atau mengubah ID/versi/waktu/aksi. Gunakan filter view saat meninjau data.'}}]},{values:[{userEnteredValue:{stringValue:'Data demo tidak disalin. File ini tetap privat sesuai izin Google Drive Anda.'}}]},{values:[{userEnteredValue:{stringValue:'Perubahan sel dibaca ulang oleh dashboard, tetapi hanya data valid yang diterapkan. Perubahan struktur atau urutan dapat membatalkan riwayat.'}}]}]}]}]})}) as {spreadsheetId:string};return parseSheetId(result.spreadsheetId);
+    const result=await api('',{method:'POST',body:JSON.stringify({properties:{title:'Lunas — Debt Tracker',timeZone:'Asia/Jakarta'},sheets:[{properties:{title:'Transaksi',gridProperties:{rowCount:1000,columnCount:16,frozenRowCount:1}},data:[{startRow:0,startColumn:0,rowData:[header]}]},{properties:{title:'Panduan',gridProperties:{rowCount:20,columnCount:2}},data:[{rowData:[{values:[{userEnteredValue:{stringValue:'Lunas — jurnal cicilan pribadi'}}]},{values:[{userEnteredValue:{stringValue:'Gunakan dashboard untuk menambah utang, membayar, dan membatalkan catatan. Setiap aksi menambah baris di Transaksi.'}}]},{values:[{userEnteredValue:{stringValue:'Jangan menghapus, mengurutkan, atau mengubah ID/versi/waktu/aksi. Gunakan filter view saat meninjau data.'}}]},{values:[{userEnteredValue:{stringValue:'Data demo tidak disalin. File ini tetap privat sesuai izin Google Drive Anda.'}}]},{values:[{userEnteredValue:{stringValue:'Perubahan sel dibaca ulang oleh dashboard, tetapi hanya data valid yang diterapkan. Perubahan struktur atau urutan dapat membatalkan riwayat.'}}]}]}]}]})}) as {spreadsheetId:string};return parseSheetId(result.spreadsheetId);
   }
   return{read,write,create};
 }
