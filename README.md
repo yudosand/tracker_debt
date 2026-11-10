@@ -6,6 +6,10 @@ Alamat setelah deployment berhasil: https://yudosand.github.io/tracker_debt/
 
 ## Rencana bayar akhir bulan
 
+Tombol **Sembunyikan bunga** hanya mengubah kartu utama Ringkasan Keuangan menjadi total pokok pinjaman awal seluruh kontrak, sebelum dikurangi pembayaran. **Tampilkan bunga** mengembalikan sisa seluruh cicilan termasuk bunga/biaya. Pilihan ini disimpan per browser; nominal pembayaran dan kartu utang tidak berubah.
+
+**Tandai semua cicilan bulan ini dibayar** menampilkan daftar angsuran dalam agenda, total termasuk bunga, tanggal pembayaran bersama, dan konfirmasi transfer. Pembayaran sekaligus tersedia untuk koneksi Apps Script dan demo. Backend memvalidasi semua angsuran dan versi kontrak di dalam satu ScriptLock sebelum menulis satu rentang jurnal. ID tetap pada dialog memungkinkan pengiriman ulang setelah respons terputus tanpa menggandakan catatan. Jika data berubah atau sebagian ID telah tersimpan, muat ulang dan tinjau daftar baru. Riwayat tetap per angsuran dan bisa dikoreksi per catatan. Maksimum 500 angsuran per pengiriman; tidak melunasi tenor mendatang di luar agenda.
+
 Agenda dan total bulanan mengikuti pola pembayaran bersama: pinjaman dengan nama yang memuat kata **Kopkari** dibayar pada bulan jatuh tempo (autodebet); pinjaman lain dibayar pada akhir bulan sebelumnya. Contoh: jatuh tempo 1 atau 23 Desember masuk rencana November. Aturan ini berlaku sama di kedua perangkat melalui `src/payment-plan.ts`, tanpa mengubah jurnal Google Sheets.
 
 Rincian angsuran dan target lunas menampilkan bulan rencana bayar, beserta tanggal jatuh tempo kontrak dan tanggal pembayaran sebenarnya. Total mencakup angsuran yang belum dibayar sampai bulan rencana berjalan, termasuk rencana bulan sebelumnya. Pembayaran yang sudah tercatat dan kontrak lunas tidak dihitung lagi. Agenda menampilkan seluruh pinjaman terkait dalam daftar yang dapat digulir; tombol pembayaran tetap mencatat satu angsuran penuh.

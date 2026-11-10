@@ -94,10 +94,42 @@ function writeLunas_(request,props){
   sheet.getRange(rows.length+1,1,1,16).setNumberFormat('@').setValues([row]);SpreadsheetApp.flush();
   const saved=readLunas_(props);if(!saved.projection.accepted.has(id))throw new Error('Catatan belum terkonfirmasi. Muat ulang untuk memeriksa riwayat.');return saved.rows;
 }
+function writeBatchLunas_(request,props){
+  const actions=request.actions;
+  if(!Array.isArray(actions)||!actions.length||actions.length>500||actions.some(a=>!a||a.type!=='pay'))throw new Error('Pilih 1 sampai 500 angsuran untuk pembayaran sekaligus.');
+  const ids=actions.map(a=>a.id);
+  if(new Set(ids).size!==ids.length)throw new Error('ID pembayaran dalam daftar tidak boleh berulang.');
+  const {sheet,rows,projection}=readLunas_(props),existing=new Map(rows.slice(1).map(row=>[row[0],row]));
+  let savedCount=0;
+  for(const action of actions){
+    const row=existing.get(action.id);if(!row)continue;
+    if(!projection.accepted.has(action.id)||canonicalLunas_(LunasCore.decodeEntry(row,0).action)!==canonicalLunas_(action))throw new Error('ID pembayaran sudah digunakan untuk catatan berbeda. Muat ulang data.');
+    savedCount++;
+  }
+  if(savedCount===actions.length)return rows;
+  if(savedCount)throw new Error('Sebagian catatan sudah ada. Muat ulang data sebelum memilih pembayaran berikutnya.');
+  for(const debtId of new Set(actions.map(a=>a.debtId))){
+    if((projection.revisions.get(debtId)||'')!==request.revisions?.[debtId])throw new Error('Data berubah di perangkat lain. Muat ulang dan periksa daftar pembayaran.');
+  }
+  if(rows.length+actions.length>50000)throw new Error('Jurnal melebihi 50.000 baris.');
+  // Validate the complete batch before a single rectangular write, under the script lock.
+  const pending=[],at=new Date().toISOString();
+  for(const action of actions){
+    const row=LunasCore.encodeEntry(action,projection,at);
+    if(row.some(value=>typeof value==='string'&&value.startsWith('=')))throw new Error('Nama dan nomor kontrak tidak boleh diawali tanda =.');
+    projection.ledger=LunasCore.applyAction(projection.ledger,action,at);
+    projection.revisions.set(action.debtId,action.id);pending.push(row);
+  }
+  if(rows.length+pending.length>sheet.getMaxRows())sheet.insertRowsAfter(sheet.getMaxRows(),Math.max(100,rows.length+pending.length-sheet.getMaxRows()));
+  sheet.getRange(rows.length+1,1,pending.length,16).setNumberFormat('@').setValues(pending);SpreadsheetApp.flush();
+  const saved=readLunas_(props);
+  if(actions.some(a=>!saved.projection.accepted.has(a.id)))throw new Error('Hasil penyimpanan belum terkonfirmasi. Muat ulang untuk memeriksa riwayat sebelum mencoba lagi.');
+  return saved.rows;
+}
 function lunasRequest(request){
   const lock=LockService.getScriptLock();
   try{
-    if(!request||typeof request!=='object'||JSON.stringify(request).length>16000)throw new Error('Permintaan tidak valid.');
+    if(!request||typeof request!=='object'||JSON.stringify(request).length>(request.method==='writeBatch'?160000:16000))throw new Error('Permintaan tidak valid.');
     lock.waitLock(30000);
     const props=PropertiesService.getScriptProperties();
     if(!props.getProperty('PASSWORD_HASH')||!props.getProperty('PASSWORD_PEPPER')||!props.getProperty('SPREADSHEET_ID'))errorLunas_('SETUP','Pemilik perlu menjalankan setupLunas terlebih dahulu.');
@@ -106,6 +138,7 @@ function lunasRequest(request){
     if(request.method==='logout'){props.deleteProperty(sessionKey);return {ok:true,data:null};}
     if(request.method==='read')return {ok:true,data:readLunas_(props).rows};
     if(request.method==='write')return {ok:true,data:writeLunas_(request,props)};
+    if(request.method==='writeBatch')return {ok:true,data:writeBatchLunas_(request,props)};
     throw new Error('Aksi tidak dikenal.');
   }catch(error){return {ok:false,code:error.code||'REQUEST',message:error.message||'Penyimpanan gagal.'};}
   finally{if(lock.hasLock())lock.releaseLock();}

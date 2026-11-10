@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {plannedPaymentMonth,plannedInstallmentCount} from '../src/payment-plan.ts';
+import {monthlyPaymentBatch,plannedPaymentMonth,plannedInstallmentCount} from '../src/payment-plan.ts';
 import {applyAction,stats,installmentSchedule} from '../src/debt.ts';
 
 const debt={id:'plan',name:'Pinjaman',contract:'',principal:3000000,months:3,installment:1100000,initialPaid:0,firstDue:'2026-12-01',color:'green'};
+test('monthly bulk selection includes only unpaid planned installments at full contractual amounts',()=>{
+  const ledger={debts:[debt,{...debt,id:'kopkari',name:'Kopkari',firstDue:'2026-11-30'},{...debt,id:'future',firstDue:'2027-01-01'},{...debt,id:'paid',initialPaid:3}],payments:[]};
+  let id=0;const items=monthlyPaymentBatch(ledger,'2026-11-10',()=>String(++id));
+  assert.deepEqual(items.map(p=>p.debtId),['plan','kopkari']);
+  assert.equal(items.reduce((sum,p)=>sum+p.amount,0),2200000);
+  assert.ok(items.every(p=>p.number===1));assert.equal(new Set(items.map(p=>p.id)).size,2);
+  assert.equal(monthlyPaymentBatch({debts:[],payments:[]},'2026-11-10').length,0);
+});
 test('December installments are budgeted in November, including late-month due dates',()=>{
   for(const day of ['01','15','31']){
     const d={...debt,firstDue:'2026-12-'+day};

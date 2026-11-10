@@ -62,6 +62,15 @@ export async function scriptLogout(url:string){
   if(session)await request(url,{method:'logout',token:session.token});
 }
 export const scriptSheets={
+  async writeBatch(url:string,actions:Extract<Action,{type:'pay'}>[]){
+    const before=await scriptSheets.read(url);
+    const revisions=Object.fromEntries(actions.map(a=>[a.debtId,before.revisions.get(a.debtId)||'']));
+    const rows=await request(url,{method:'writeBatch',token:token(url),actions,revisions}) as unknown[][];
+    if(!Array.isArray(rows))throw new Error('Format respons penyimpanan tidak valid.');
+    const result=replay(rows);
+    if(actions.some(a=>!result.accepted.has(a.id)))throw new Error('Sebagian pembayaran belum terkonfirmasi. Muat ulang dan periksa riwayat.');
+    return result;
+  },
   async read(url:string){const rows=await request(url,{method:'read',token:token(url)}) as unknown[][];if(!Array.isArray(rows))throw new Error('Format data spreadsheet tidak valid.');return replay(rows);},
   async write(url:string,action:Action){
     const before=await scriptSheets.read(url);

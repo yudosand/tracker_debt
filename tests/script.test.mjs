@@ -25,7 +25,54 @@ test('password setup preserves existing journal and removes plaintext password',
   assert.equal(b.values.SPREADSHEET_ID,'private-sheet-not-committed');
 });
 test('anonymous requests cannot read, append or log out sessions',()=>{
-  const b=backend();for(const method of ['read','write','logout'])assert.equal(b.call({method}).code,'AUTH');assert.equal(b.rows.length,2);
+  const b=backend();for(const method of ['read','write','writeBatch','logout'])assert.equal(b.call({method}).code,'AUTH');assert.equal(b.rows.length,2);
+});
+
+function batchFixture(){
+  const b=backend();b.rows.push(encodeEntry({type:'add',debt:{...debt,id:'d2',name:'Kedua'}},replay(b.rows)));
+  const token=b.login().data.token;
+  const actions=[{type:'pay',id:'batch1',debtId:'d1',number:5,paidAt:'2026-05-01'},{type:'pay',id:'batch2',debtId:'d2',number:5,paidAt:'2026-05-01'}];
+  const request={method:'writeBatch',token,actions,revisions:{d1:'add-d1',d2:'add-d2'}};
+  return {...b,request};
+}
+test('bulk payments preserve individual history and can be safely retried',()=>{
+  const b=batchFixture();assert.equal(b.call(b.request).ok,true);assert.equal(b.rows.length,5);
+  assert.equal(b.call(b.request).ok,true);assert.equal(b.rows.length,5);
+  const p=replay(b.rows);assert.equal(p.ledger.payments.length,2);assert.equal(p.conflicts.length,0);
+  assert.equal(b.call({method:'write',token:b.request.token,action:{type:'undo',paymentId:'batch1'},revision:'batch1'}).ok,true);
+  assert.ok(replay(b.rows).ledger.payments.find(p=>p.id==='batch1').voidedAt);
+});
+test('bulk validation failure leaves all debts unchanged',()=>{
+  const b=batchFixture();b.request.actions[1].number=8;
+  assert.equal(b.call(b.request).ok,false);assert.equal(b.rows.length,3);
+  assert.equal(replay(b.rows).ledger.payments.length,0);
+});
+test('a second user cannot record the same batch or partially apply stale revisions',()=>{
+  const b=batchFixture();const second=structuredClone(b.request);second.actions.forEach(a=>a.id+='-other');
+  assert.equal(b.call({method:'write',token:b.request.token,action:b.request.actions[1],revision:'add-d2'}).ok,true);
+  assert.equal(b.call(second).ok,false);assert.equal(b.rows.length,4);
+  assert.equal(replay(b.rows).ledger.payments.filter(p=>p.debtId==='d1').length,0);
+});
+test('a lost bulk response can be recovered without duplicate rows',()=>{
+  const b=batchFixture();b.context.SpreadsheetApp.flush=()=>{throw Error('Connection interrupted');};
+  assert.equal(b.call(b.request).ok,false);assert.equal(b.rows.length,5);
+  b.context.SpreadsheetApp.flush=()=>{};
+  assert.equal(b.call(b.request).ok,true);assert.equal(b.rows.length,5);
+});
+test('bulk supports consecutive arrears but rejects duplicate IDs and unsupported actions',()=>{
+  const b=batchFixture();b.request.actions[1]={...b.request.actions[0],id:'next',number:6};
+  assert.equal(b.call(b.request).ok,true);assert.equal(replay(b.rows).ledger.payments.length,2);
+  const c=batchFixture();c.request.actions[1].id=c.request.actions[0].id;
+  assert.equal(c.call(c.request).ok,false);assert.equal(c.rows.length,3);
+  c.request.actions=[{type:'undo',paymentId:'batch1'}];assert.equal(c.call(c.request).ok,false);
+  c.request.actions=[];assert.equal(c.call(c.request).ok,false);
+  c.request.actions=Array.from({length:501},()=>({type:'pay'}));assert.equal(c.call(c.request).ok,false);
+});
+test('bulk retries reject changed payment details and partial saved batches',()=>{
+  const b=batchFixture();assert.equal(b.call(b.request).ok,true);
+  b.request.actions[0].paidAt='2026-05-02';assert.equal(b.call(b.request).ok,false);assert.equal(b.rows.length,5);
+  const c=batchFixture();assert.equal(c.call({method:'write',token:c.request.token,action:c.request.actions[0],revision:'add-d1'}).ok,true);
+  assert.equal(c.call(c.request).ok,false);assert.equal(c.rows.length,4);
 });
 
 test('six-character PINs work while shorter values are rejected',()=>{
