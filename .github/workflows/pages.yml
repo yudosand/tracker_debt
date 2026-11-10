@@ -22,6 +22,7 @@ jobs:
       - run: npm run build
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          VITE_APPS_SCRIPT_URL: ${{ vars.APPS_SCRIPT_URL }}
           BASE_PATH: /tracker_debt/
       - uses: actions/upload-pages-artifact@v3
         with:

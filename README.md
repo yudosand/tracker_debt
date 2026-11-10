@@ -1,10 +1,22 @@
 # Lunas — Debt Tracker
 
-Dashboard cicilan pribadi berbahasa Indonesia. **GitHub Pages + React/Vite + Google Sheets API**, tanpa server aplikasi dan tanpa Apps Script.
+Dashboard cicilan pribadi berbahasa Indonesia. **GitHub Pages + React/Vite + Google Sheets**, dengan pilihan login password melalui Apps Script. Koneksi OAuth langsung sebelumnya tetap tersedia sampai penghubung password dikonfigurasi.
 
 Alamat setelah deployment berhasil: https://yudosand.github.io/tracker_debt/
 
-## Penggunaan pertama
+## Login password (direkomendasikan)
+
+Ikuti [panduan pemasangan sekali](public/login-sederhana.html). Pemilik memasang [kode penghubung](public/lunas-apps-script.gs) melalui menu Ekstensi → Apps Script pada spreadsheet lama, mengatur password di Script Properties, menjalankan `setupLunas`, lalu deploy sebagai pemilik dengan akses Anyone. Setiap operasi tetap memerlukan password/sesi yang divalidasi server. Tidak ada data jurnal yang dipindahkan atau dihapus oleh setup.
+
+Di dashboard → Google Sheets, masukkan URL /exec dan password. Dua pengguna dapat memakai password yang sama. Dengan “Ingat perangkat ini”, sesi tersimpan di browser selama maksimal 30 hari dan berlaku lintas tab serta restart browser; tanpa opsi tersebut, sesi hanya di sessionStorage selama maksimal 12 jam. Logout mencabut sesi di server. Setup ulang password mencabut semua sesi. Password dan token OAuth Google tidak disimpan di browser atau repository. Token sesi dashboard adalah kredensial, dan hanya hash token disimpan di server.
+
+Opsional: variable GitHub Actions `APPS_SCRIPT_URL` menjadi konfigurasi URL awal bagi semua perangkat. URL ini publik; jangan mengisi password atau ID spreadsheet pada variable tersebut. `ALLOWED_ORIGIN` di Script Properties harus cocok dengan origin dashboard. Frontend berkomunikasi dengan sandbox HTML Service melalui postMessage yang dibatasi origin dan kanal acak; sandbox menggunakan google.script.run. Tidak menggunakan no-cors atau JSONP untuk mengirim password.
+
+Sumber server ada di `apps-script/`, memakai model jurnal yang sama dengan website. Setelah mengubah server/model, jalankan `npm run script:build`. Pemeriksaan test menolak bundle Apps Script yang tidak sinkron. Apps Script menggunakan ScriptLock, pemeriksaan revisi per kontrak, dan idempotensi ID sebelum menambah baris. Hindari memakai koneksi OAuth lama bersamaan untuk menulis setelah migrasi, karena ScriptLock hanya mengunci penulisan yang melalui Apps Script.
+
+GitHub Pages biasa tetap publik walaupun repository private. Data spreadsheet dilindungi di penghubung server, bukan dengan menyembunyikan source atau hanya mengunci tampilan.
+
+## Koneksi OAuth langsung (opsional)
 
 1. Ikuti [panduan Google](public/panduan.html) (juga tersedia di menu Google Sheets pada dashboard).
 2. Buat OAuth Client ID Google bertipe **Web application**. Aktifkan Google Sheets API, tambahkan akun Anda sebagai test user saat aplikasi berstatus Testing, lalu daftarkan origin `https://yudosand.github.io`.
@@ -38,8 +50,8 @@ Buka `http://127.0.0.1:5174/tracker_debt/`. Untuk Google OAuth lokal, gunakan `h
 
 ## Penyimpanan dan sinkronisasi
 
-- Tanpa koneksi, mode demo menggunakan localStorage dan diberi label jelas. Konfigurasi koneksi tersimpan di browser; data live dan access token tidak disimpan di localStorage.
-- Token hanya berada di memori tab. Setelah reload/kedaluwarsa, pengguna harus menghubungkan Google lagi. Error akses tidak pernah mengalihkan data asli diam-diam ke demo.
+- Tanpa konfigurasi, mode demo menggunakan localStorage dan diberi label jelas. Data finansial live tidak disimpan di localStorage. Konfigurasi dan sesi dashboard yang diingat dapat disimpan di browser.
+- Dalam mode OAuth lama, token Google hanya berada di memori tab sehingga reload meminta koneksi kembali. Mode password menggunakan sesi server yang bisa diingat. Error akses tidak pernah mengalihkan data asli diam-diam ke demo.
 - Data dibaca saat masuk, setelah perubahan, ketika refresh ditekan, dan tiap 30 detik selama halaman aktif tanpa dialog pembayaran.
 - Setiap mutasi **menambah baris** ke tab `Transaksi`; tidak ada penimpaan seluruh spreadsheet. `eventId` mencegah penghitungan ulang pengiriman yang sama. `versiSebelum` menolak transaksi bersamaan yang memakai versi kontrak yang sudah berubah.
 - Jurnal diproses berdasarkan urutan baris. Untuk dua pembayaran dengan nomor angsuran yang sama dari tab/perangkat berbeda, hanya transaksi pertama yang sesuai versi yang diterapkan. Konflik tetap tersimpan sebagai bukti dan ditampilkan sebagai peringatan; operasi yang kalah tidak dinyatakan berhasil.

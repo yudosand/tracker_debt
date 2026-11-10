@@ -1,0 +1,12 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><script>
+(()=>{
+  const origin=__LUNAS_ORIGIN__,channel=__LUNAS_CHANNEL__;
+  const send=(message)=>window.top.postMessage({type:'lunas-bridge',channel,...message},origin);
+  window.addEventListener('message',event=>{
+    const message=event.data;
+    if(event.origin!==origin||event.source!==window.top||!message||message.type!=='lunas-request'||message.channel!==channel||typeof message.id!=='string')return;
+    google.script.run.withSuccessHandler(reply=>send({id:message.id,reply})).withFailureHandler(()=>send({id:message.id,reply:{ok:false,code:'TRANSPORT',message:'Apps Script tidak dapat menyelesaikan permintaan. Muat ulang untuk memeriksa data sebelum mencoba lagi.'}})).lunasRequest(message.payload);
+  });
+  send({ready:true});
+})();
+</script></body></html>
