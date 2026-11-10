@@ -4,6 +4,12 @@ Dashboard cicilan pribadi berbahasa Indonesia. **GitHub Pages + React/Vite + Goo
 
 Alamat setelah deployment berhasil: https://yudosand.github.io/tracker_debt/
 
+## Rencana bayar akhir bulan
+
+Agenda dan total bulanan mengikuti pola pembayaran bersama: pinjaman dengan nama yang memuat kata **Kopkari** dibayar pada bulan jatuh tempo (autodebet); pinjaman lain dibayar pada akhir bulan sebelumnya. Contoh: jatuh tempo 1 atau 23 Desember masuk rencana November. Aturan ini berlaku sama di kedua perangkat melalui `src/payment-plan.ts`, tanpa mengubah jurnal Google Sheets.
+
+Rincian angsuran dan target lunas menampilkan bulan rencana bayar, beserta tanggal jatuh tempo kontrak dan tanggal pembayaran sebenarnya. Total mencakup angsuran yang belum dibayar sampai bulan rencana berjalan, termasuk rencana bulan sebelumnya. Pembayaran yang sudah tercatat dan kontrak lunas tidak dihitung lagi. Agenda menampilkan seluruh pinjaman terkait dalam daftar yang dapat digulir; tombol pembayaran tetap mencatat satu angsuran penuh.
+
 ## Login password (direkomendasikan)
 
 Ikuti [panduan pemasangan sekali](public/login-sederhana.html). Pemilik memasang [kode penghubung](public/lunas-apps-script.gs) melalui menu Ekstensi → Apps Script pada spreadsheet lama, mengatur password di Script Properties, menjalankan `setupLunas`, lalu deploy sebagai pemilik dengan akses Anyone. Setiap operasi tetap memerlukan password/sesi yang divalidasi server. Tidak ada data jurnal yang dipindahkan atau dihapus oleh setup.
