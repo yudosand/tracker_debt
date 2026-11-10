@@ -1,6 +1,9 @@
 import {dueDate} from './debt.ts';
 import type {Debt} from './debt.ts';
 
+// Derived from the first contractual installment, independent of early payments.
+export function disbursementDate(debt:Debt){return dueDate(debt,0);}
+
 // Shared household policy: Kopkari is auto-debited in its due month;
 // other installments are budgeted at the end of the preceding month.
 export function isKopkari(debt:Debt){return /\bkopkari\b/i.test(debt.name);}
