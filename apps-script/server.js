@@ -15,6 +15,13 @@ function setupLunas(){
   if(!active||!owner||active!==owner)throw new Error('Setup hanya dapat dijalankan pemilik dari editor Apps Script.');
   setupLunas_();
 }
+// Read-only owner check also verifies the scope needed by deployed web apps.
+function checkLunas(){
+  const active=Session.getActiveUser().getEmail(),owner=Session.getEffectiveUser().getEmail();
+  if(!active||!owner||active!==owner)throw new Error('Pemeriksaan hanya dapat dijalankan pemilik.');
+  readLunas_(PropertiesService.getScriptProperties());
+  console.log('Koneksi spreadsheet berhasil. Data tidak diubah.');
+}
 // Run ONLY in the Apps Script editor after setting APP_PASSWORD in Script Properties.
 // A trailing underscore makes this function inaccessible to google.script.run.
 function setupLunas_(){

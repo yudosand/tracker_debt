@@ -40,10 +40,12 @@ test('public setup entry rejects anonymous callers and other accounts',()=>{
   for(const email of ['', 'other@example.com']){
     b.context.Session={getActiveUser:()=>({getEmail:()=>email}),getEffectiveUser:()=>({getEmail:()=> 'owner@example.com'})};
     assert.throws(()=>b.context.setupLunas(),/pemilik/);
+    assert.throws(()=>b.context.checkLunas(),/pemilik/);
     assert.equal(b.values.PASSWORD_HASH,hash);assert.equal(b.rows.length,2);
   }
   b.context.Session={getActiveUser:()=>({getEmail:()=> 'owner@example.com'}),getEffectiveUser:()=>({getEmail:()=> 'owner@example.com'})};
   b.values.APP_PASSWORD=password;b.context.setupLunas();assert.notEqual(b.values.PASSWORD_HASH,hash);
+  b.context.checkLunas();assert.equal(b.rows.length,2);
 });
 test('login, expiry, logout and password rotation are enforced on the server',()=>{
   const b=backend(),r=b.login();assert.equal(r.ok,true);assert.ok(r.data.expiresAt>Date.now()+29*86400000);
