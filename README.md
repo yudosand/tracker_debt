@@ -10,9 +10,13 @@ Tombol **Sembunyikan bunga** hanya mengubah kartu utama Ringkasan Keuangan menja
 
 **Tandai semua cicilan bulan ini dibayar** menampilkan daftar angsuran dalam agenda, total termasuk bunga, tanggal pembayaran bersama, dan konfirmasi transfer. Pembayaran sekaligus tersedia untuk koneksi Apps Script dan demo. Backend memvalidasi semua angsuran dan versi kontrak di dalam satu ScriptLock sebelum menulis satu rentang jurnal. ID tetap pada dialog memungkinkan pengiriman ulang setelah respons terputus tanpa menggandakan catatan. Jika data berubah atau sebagian ID telah tersimpan, muat ulang dan tinjau daftar baru. Riwayat tetap per angsuran dan bisa dikoreksi per catatan. Maksimum 500 angsuran per pengiriman; tidak melunasi tenor mendatang di luar agenda.
 
-Agenda dan total bulanan mengikuti pola pembayaran bersama: pinjaman dengan nama yang memuat kata **Kopkari** dibayar pada bulan jatuh tempo (autodebet); pinjaman lain dibayar pada akhir bulan sebelumnya. Contoh: jatuh tempo 1 atau 23 Desember masuk rencana November. Aturan ini berlaku sama di kedua perangkat melalui `src/payment-plan.ts`, tanpa mengubah jurnal Google Sheets.
+Total **Rencana pembayaran bulan ini** menjumlahkan satu cicilan penuh setiap pinjaman aktif. Mencatat pembayaran biasa tidak mengurangi total ini; pinjaman yang lunas keluar dari total. Nominal dihitung dari data, bukan angka tetap. Subtotal A dan B memakai aturan yang sama.
 
-Rincian angsuran dan target lunas menampilkan bulan rencana bayar, beserta tanggal jatuh tempo kontrak dan tanggal pembayaran sebenarnya. Total mencakup angsuran yang belum dibayar sampai bulan rencana berjalan, termasuk rencana bulan sebelumnya. Pembayaran yang sudah tercatat dan kontrak lunas tidak dihitung lagi. Agenda menampilkan seluruh pinjaman terkait dalam daftar yang dapat digulir; tombol pembayaran tetap mencatat satu angsuran penuh.
+**Belum dicatat bulan ini**, agenda, dan tombol pembayaran sekaligus hanya mencakup pinjaman aktif tanpa pembayaran sah bertanggal bulan berjalan. Angka ini turun setelah pencatatan dan kembali menghitung pinjaman aktif pada bulan berikutnya. Saldo awal tidak memiliki tanggal pembayaran, sehingga tidak otomatis dianggap pembayaran bulan berjalan. Setiap pinjaman mendapat paling banyak satu angsuran dalam satu batch; pembayaran tambahan atau tanggal bulan sebelumnya dapat dicatat lewat kartu. Pembatalan mengembalikan pinjaman ke agenda jika tidak ada pembayaran lain pada bulan tersebut.
+
+Tag **A**: S1, S2, S3, S4, S5, S7, S8, S10, S13, S14. Tag **B**: Kopkari, S6, S9, S11, S12, S15, S16. Nama S/Spinjam dikenali tanpa membedakan huruf besar/kecil dan spasi; nama lain ditandai belum dikelompokkan serta tetap masuk total. Aturan ini sama untuk kedua pengguna, tanpa perubahan jurnal Google Sheets.
+
+Rincian angsuran tetap menampilkan jadwal kontrak asli: Kopkari pada bulan jatuh tempo, pinjaman lain pada akhir bulan sebelumnya. Tanggal pembayaran sebenarnya dicatat terpisah. Target lunas adalah acuan jadwal awal; pembayaran lebih cepat dapat mempercepat pelunasan.
 
 ## Login password (direkomendasikan)
 

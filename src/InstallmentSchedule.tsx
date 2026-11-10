@@ -9,10 +9,10 @@ const labels={paid:'Dibayar',overdue:'Lewat tempo',due:'Jatuh tempo hari ini',up
 export default function InstallmentSchedule({debt,payments}:{debt:Debt;payments:Payment[]}){
   const rows=installmentSchedule(debt,payments),complete=rows.every(row=>row.status==='paid');
   return <div className="installment-section">
-    <div className="payoff-target"><CalendarDays size={17}/><div><span>{complete?'Akhir rencana bayar':'Target lunas · rencana bayar'}</span><strong>{paymentMonthLabel(plannedPaymentMonth(debt,debt.months))}</strong></div></div>
+    <div className="payoff-target"><CalendarDays size={17}/><div><span>{complete?'Akhir jadwal awal':'Target lunas · jadwal awal'}</span><strong>{paymentMonthLabel(plannedPaymentMonth(debt,debt.months))}</strong></div></div>
     <details className="installment-schedule">
       <summary><span>Rincian {debt.months} bulan<span className="sr-only"> · {debt.name}</span></span><ChevronDown size={16}/></summary>
-      <p className="schedule-note">{isKopkari(debt)?'Kopkari: autodebet pada bulan jatuh tempo.':'Rencana bayar: akhir bulan sebelum jatuh tempo.'} Bulan di bawah adalah rencana bayar; tanggal transfer dicatat terpisah. Target lunas mengikuti rencana ini.</p>
+      <p className="schedule-note">{isKopkari(debt)?'Acuan awal Kopkari: bulan jatuh tempo.':'Acuan awal: bulan sebelum jatuh tempo.'} Agenda bulan berjalan menyiapkan satu angsuran per pinjaman aktif, termasuk lebih awal dari acuan ini. Tanggal pembayaran sebenarnya dicatat terpisah; pelunasan bisa lebih cepat.</p>
       <ol className="installment-list" aria-label={`Jadwal angsuran ${debt.name}`}>
         {rows.map(row=><li key={row.number} className={'installment-row '+row.status}>
           <div className="installment-heading"><strong>{paymentMonthLabel(plannedPaymentMonth(debt,row.number))}</strong><span className={'installment-status '+row.status}>{labels[row.status]}</span></div>
