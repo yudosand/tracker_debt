@@ -28,6 +28,13 @@ test('anonymous requests cannot read, append or log out sessions',()=>{
   const b=backend();for(const method of ['read','write','logout'])assert.equal(b.call({method}).code,'AUTH');assert.equal(b.rows.length,2);
 });
 
+test('six-character PINs work while shorter values are rejected',()=>{
+  const b=backend();b.values.APP_PASSWORD='12345';assert.throws(()=>b.context.setupLunas_(),/minimal 6/);
+  b.values.APP_PASSWORD='629417';b.context.setupLunas_();
+  assert.equal(b.call({method:'login',password:'629417'}).ok,true);
+  assert.equal(b.values.APP_PASSWORD,undefined);
+});
+
 test('public setup entry rejects anonymous callers and other accounts',()=>{
   const b=backend(),hash=b.values.PASSWORD_HASH;
   for(const email of ['', 'other@example.com']){

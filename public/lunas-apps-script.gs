@@ -170,7 +170,7 @@ function setupLunas(){
 // A trailing underscore makes this function inaccessible to google.script.run.
 function setupLunas_(){
   const props=PropertiesService.getScriptProperties(),password=props.getProperty('APP_PASSWORD');
-  if(!password||password.length<12||password.length>200)throw new Error('Atur APP_PASSWORD minimal 12 karakter di Project Settings > Script Properties.');
+  if(!password||password.length<6||password.length>200)throw new Error('Atur APP_PASSWORD minimal 6 karakter di Project Settings > Script Properties.');
   const ss=SpreadsheetApp.getActiveSpreadsheet();
   if(!ss)throw new Error('Buka Apps Script melalui menu Ekstensi pada spreadsheet Lunas yang sudah ada.');
   const sheet=ss.getSheetByName('Transaksi');
